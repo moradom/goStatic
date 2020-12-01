@@ -11,6 +11,8 @@ import (
 	"io/ioutil"
 	"log"
 	"net/http"
+	"os"
+	"regexp"
 	"strconv"
 	"strings"
 	"sync"
@@ -18,10 +20,10 @@ import (
 
 var (
 	// Def of flags
-	portPtr                  = flag.Int("port", 8043, "The listening port")
+	portPtr                  = flag.Int("port", 1080, "The listening port")
 	context                  = flag.String("context", "", "The 'context' path on which files are served, e.g. 'doc' will serve the files at 'http://localhost:<port>/doc/'")
 	basePath                 = flag.String("path", "/srv/http", "The path for the static files")
-	fallbackPath             = flag.String("fallback", "", "Default fallback file. Either absolute for a specific asset (/index.html), or relative to recursively resolve (index.html)")
+	fallbackPath             = flag.String("fallback", "/index.html", "Default fallback file. Either absolute for a specific asset (/index.html), or relative to recursively resolve (index.html)")
 	headerFlag               = flag.String("append-header", "", "HTTP response header, specified as `HeaderName:Value` that should be added to all responses.")
 	basicAuth                = flag.Bool("enable-basic-auth", false, "Enable basic auth. By default, password are randomly generated. Use --set-basic-auth to set it.")
 	healthCheck              = flag.Bool("enable-health", false, "Enable health check endpoint. You can call /health to get a 200 response. Useful for Kubernetes, OpenFaas, etc.")
@@ -34,6 +36,8 @@ var (
 
 	username string
 	password string
+
+	defaultPageBytes []byte
 )
 
 func parseHeaderFlag(headerFlag string) (string, string) {
@@ -86,6 +90,50 @@ func handleReq(h http.Handler) http.Handler {
 	})
 }
 
+func parseFallbackPage() {
+	if len(flag.Args()) % 2 != 0 {
+		log.Println("Passing variables to be replaced on base file needs to be done by pair var value")
+		os.Exit(1)
+	}
+
+	data, err := ioutil.ReadFile(*basePath + *fallbackPath)
+
+	if err != nil {
+		log.Println("Unable to open file " + *basePath + *fallbackPath)
+		os.Exit(2)
+	}
+
+	page := string(data)
+
+	for i := len(flag.Args()) -1; i >= 1; i -= 2 {
+		regex := regexp.MustCompile(`'`+flag.Arg(i-1)+`' *: *'[^']*'`)
+		page = regex.ReplaceAllString(page, `'`+flag.Arg(i-1)+`':'`+flag.Arg(i)+`'`)
+	}
+
+	defaultPageBytes = []byte(page)
+
+	err = ioutil.WriteFile(*basePath + *fallbackPath, defaultPageBytes, 0644)
+
+	if err != nil {
+		log.Println("Unable to write file " + *basePath + *fallbackPath)
+		os.Exit(3)
+	}
+
+}
+
+func defaultPage(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+
+		if len(r.RequestURI) == 0 || r.URL.RequestURI() == "/" || r.URL.RequestURI() == *fallbackPath  {
+			log.Println("Passing here " + r.URL.RequestURI())
+			w.Header().Set("Content-Type", "text/html") // clarify return type (MIME)
+			_, _ = w.Write(defaultPageBytes)
+		} else {
+			next.ServeHTTP(w, r)
+		}
+	})
+}
+
 func main() {
 
 	flag.Parse()
@@ -107,6 +155,11 @@ func main() {
 	}
 
 	handler := handleReq(http.FileServer(fileSystem))
+
+	if *fallbackPath != "" {
+		parseFallbackPage()
+		handler = defaultPage(handler)
+	}
 
 	pathPrefix := "/"
 	if len(*context) > 0 {
@@ -156,7 +209,7 @@ func main() {
 
 	if *healthCheck {
 		http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
-			fmt.Fprintf(w, "Ok")
+			_, _ = fmt.Fprintf(w, "Ok")
 		})
 	}
 
