@@ -1,6 +1,8 @@
 # goStatic [![Docker Pulls](https://img.shields.io/docker/pulls/pierrezemb/gostatic.svg?style=plastic)](https://hub.docker.com/r/pierrezemb/gostatic/) [![Docker Build](https://img.shields.io/docker/build/pierrezemb/gostatic.svg?style=plastic)](https://hub.docker.com/r/pierrezemb/gostatic/) [![Build Status](https://travis-ci.org/PierreZ/goStatic.svg?branch=master)](https://travis-ci.org/PierreZ/goStatic)  [![GoDoc](https://godoc.org/github.com/PierreZ/goStatic?status.svg)](https://godoc.org/github.com/PierreZ/goStatic)
 A really small static web server for Docker
 
+### Copied from https://github.com/PierreZ/goStatic
+
 ### The goal
 My goal is to create to smallest docker container for my web static files. The advantage of Go is that you can generate a fully static binary, so that you don't need anything else.
 
