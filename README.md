@@ -3,6 +3,8 @@ A really small static web server for Docker
 
 ### Copied from https://github.com/PierreZ/goStatic
 
+Created the ability to change index.html content by setting pairs of variables to have their content replaced. For example to set the maps key call the program using as parameters "maps KEY".
+
 ### The goal
 My goal is to create to smallest docker container for my web static files. The advantage of Go is that you can generate a fully static binary, so that you don't need anything else.
 
